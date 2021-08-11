@@ -1,0 +1,386 @@
+<apex:page>
+
+    <!-- download the jstree from jstree.com and upload the dist directory as a static resource -->
+    <link href="{!URLFOR($Resource.jsTree, 'style.min.css')}" rel="stylesheet" />
+    <script src="{!URLFOR($Resource.jsTree, 'jquery-3.6.0.min.js')}"></script>
+    <script src="{!URLFOR($Resource.jsTree, 'jstree.min.js')}"></script>
+    <script src="{!URLFOR($Resource.jsTree, 'jstree.min.js')}"></script>
+    <style type="text/css">
+        html,
+        body {
+            background: #ebebeb;
+            font-size: 10px;
+            font-family: Verdana;
+            margin: 0;
+            padding: 0;
+        }
+
+        #container {
+            min-width: 320px;
+            margin: 0px auto 0 auto;
+            background: white;
+            border-radius: 0px;
+            padding: 0px;
+            overflow: hidden;
+        }
+
+        #tree {
+            float: left;
+            min-width: 319px;
+            border-right: 1px solid silver;
+            overflow: auto;
+            padding: 0px 0;
+        }
+
+        #data {
+            margin-left: 320px;
+        }
+
+        #data textarea {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            border: 0;
+            background: white;
+            display: block;
+            line-height: 18px;
+            resize: none;
+        }
+
+        #data,
+        #code {
+            font: normal normal normal 12px/18px 'Consolas', monospace !important;
+        }
+
+        #tree .folder {
+            background: url('file_sprite.png') right bottom no-repeat;
+        }
+
+        #tree .file {
+            background: url('file_sprite.png') 0 0 no-repeat;
+        }
+
+        #tree .file-pdf {
+            background-position: -32px 0
+        }
+
+        #tree .file-as {
+            background-position: -36px 0
+        }
+
+        #tree .file-c {
+            background-position: -72px -0px
+        }
+
+        #tree .file-iso {
+            background-position: -108px -0px
+        }
+
+        #tree .file-htm,
+        #tree .file-html,
+        #tree .file-xml,
+        #tree .file-xsl {
+            background-position: -126px -0px
+        }
+
+        #tree .file-cf {
+            background-position: -162px -0px
+        }
+
+        #tree .file-cpp {
+            background-position: -216px -0px
+        }
+
+        #tree .file-cs {
+            background-position: -236px -0px
+        }
+
+        #tree .file-sql {
+            background-position: -272px -0px
+        }
+
+        #tree .file-xls,
+        #tree .file-xlsx {
+            background-position: -362px -0px
+        }
+
+        #tree .file-h {
+            background-position: -488px -0px
+        }
+
+        #tree .file-crt,
+        #tree .file-pem,
+        #tree .file-cer {
+            background-position: -452px -18px
+        }
+
+        #tree .file-php {
+            background-position: -108px -18px
+        }
+
+        #tree .file-jpg,
+        #tree .file-jpeg,
+        #tree .file-png,
+        #tree .file-gif,
+        #tree .file-bmp {
+            background-position: -126px -18px
+        }
+
+        #tree .file-ppt,
+        #tree .file-pptx {
+            background-position: -144px -18px
+        }
+
+        #tree .file-rb {
+            background-position: -180px -18px
+        }
+
+        #tree .file-text,
+        #tree .file-txt,
+        #tree .file-md,
+        #tree .file-log,
+        #tree .file-htaccess {
+            background-position: -254px -18px
+        }
+
+        #tree .file-doc,
+        #tree .file-docx {
+            background-position: -362px -18px
+        }
+
+        #tree .file-zip,
+        #tree .file-gz,
+        #tree .file-tar,
+        #tree .file-rar {
+            background-position: -416px -18px
+        }
+
+        #tree .file-js {
+            background-position: -434px -18px
+        }
+
+        #tree .file-css {
+            background-position: -144px -0px
+        }
+
+        #tree .file-fla {
+            background-position: -398px -0px
+        }
+    </style>
+
+    <!-- 
+Change the remoteObjectModel name="Account and 
+remoteObjectField name="ParentId" to use a different
+Object and Lookup field on this page, if desired.
+-->
+    <apex:remoteObjects>
+        <apex:remoteObjectModel jsShortHand="sfNode" name="SKFilesAndFolder__c" fields="Id,Name,icon__c">
+            <apex:remoteObjectField name="ParentId__c" jsShorthand="Parent" />
+        </apex:remoteObjectModel>
+    </apex:remoteObjects>
+
+    <script>
+        (function () {
+            var $j = jQuery.noConflict();
+
+            $j(document).ready(function () {
+
+                $j("#jstree").jstree({
+                    "plugins": ["themes", "contextmenu", "dnd"],
+                    "core": {
+                        themes: { "icons": true, "stripes": true },
+                        check_callback: true,
+                        animation: 0,
+                        data: function (node, cb) {
+                            loadNodes(this, node, cb);
+                        }
+
+                    },
+                    "types": {
+                        "default": { "icon": "folder" },
+                        "file": { "valid_children": [], "icon": "file" }
+                    },
+                    contextmenu: {
+                        "items": function (node) {
+                            return {
+                                "view": {
+                                    label: "View Record",
+                                    action: function (obj) {
+                                        window.open("/" + node.id);
+                                    }
+                                },
+                                "rename": {
+                                    label: "Rename",
+                                    action: function (obj) {
+                                        $j("#jstree").jstree(true).edit(node)
+                                    }
+                                },
+                                "create": {
+                                    label: "Create New",
+                                    action: function () {
+                                        createNode(node);
+                                    }
+                                },
+                                "delete": {
+                                    label: "Delete",
+                                    action: function () {
+                                        if (confirm("Really delete " + node.text + "?")) {
+                                            deleteNode(node);
+                                        }
+                                    },
+                                    separator_before: true
+                                }
+                            }
+                        }
+                    }
+                });
+
+                $j("#jstree").on("move_node.jstree", function (event, data) {
+                    moveNode(data);
+                });
+
+                $j("#jstree").on("rename_node.jstree", function (event, data) {
+                    renameNode(data);
+                });
+
+                $j("#jstree").on("select_node.jstree", function (event, data) {
+                    displayPath(data.node.id);
+                });
+            });
+
+            function loadNodes(tree, node, cb) {
+                var nodeId = node.id == "#" ? "" : node.id;
+
+                var sfNode = new SObjectModel.sfNode();
+
+                sfNode.retrieve({
+                    where: { Parent: { eq: nodeId } },
+                    limit: 200
+                },
+                    function (err, records) {
+                        if (err) {
+                            displayErr(err);
+                        } else {
+                            var nodes = [];
+                            records.forEach(function (record) {
+                                nodes.push({
+                                    id: record.get("Id"),
+                                    text: record.get("Name"),
+                                    //icon: record.get("icon__c"),
+                                    children: true
+                                });
+                            });
+                            cb.call(tree, nodes);
+                        }
+                    });
+            }
+
+            function moveNode(data) {
+                var parentId = data.parent == "#" ? null : data.parent;
+
+                var sfNode = new SObjectModel.sfNode({
+                    Id: data.node.id,
+                    Parent: parentId
+                });
+
+                sfNode.update(function (err) {
+                    if (err) {
+                        displayErr(err);
+                    } else {
+                        displayMsg(
+                            "Moved " + data.node.text +
+                            " from /" + getPath(data.old_parent) +
+                            " to /" + getPath(data.parent)
+                        );
+                    }
+                });
+            }
+
+            function renameNode(data) {
+                var sfNode = new SObjectModel.sfNode({
+                    Name: data.text,
+                    Id: data.node.id
+                });
+
+                sfNode.update(function (err) {
+                    if (err) {
+                        displayErr(err);
+                    } else {
+                        displayMsg("Renamed " + data.old + " to " + data.text);
+                        displayPath(data.node.id);
+                    }
+                });
+            }
+
+            function createNode(parent) {
+                var sfNode = new SObjectModel.sfNode({ Name: "New Name", Parent: parent.id });
+
+                sfNode.create(function (err) {
+                    if (err) {
+                        displayErr(err);
+                    } else {
+                        var newNode = {
+                            id: sfNode.get("Id"),
+                            text: sfNode.get("Name")
+                        };
+                        var tree = $j("#jstree").jstree(true);
+                        var id = tree.create_node(parent, newNode, "last", null, true);
+                        if (tree.is_closed(parent)) {
+                            tree.open_node(parent, function () {
+                                tree.deselect_all(true);
+                                tree.edit(id);
+                            });
+                        } else {
+                            tree.deselect_all(true);
+                            tree.edit(id);
+                        }
+                    }
+                });
+            }
+
+            function deleteNode(node) {
+                var sfNode = new SObjectModel.sfNode();
+                sfNode.del(node.id, function (err) {
+                    if (err) {
+                        displayErr(err);
+                    } else {
+                        var tree = $j("#jstree").jstree(true);
+                        tree.delete_node(node);
+                        displayMsg("Deleted " + node.text);
+                        tree.refresh();
+                    }
+                });
+            }
+
+            function getPath(id) {
+                if (id == "#") {
+                    return "";
+                }
+                return $j("#jstree").jstree(true).get_path({ id: id }, "/");
+            }
+
+            function displayPath(nodeId) {
+                $j("#path").text("Path: /" + getPath(nodeId));
+            }
+
+            function displayMsg(msg) {
+                $j("#msg").text(msg);
+            }
+
+            function displayErr(err) {
+                displayMsg("Error: " + err);
+            }
+        })();
+    </script>
+
+    <h1>Record Files </h1>
+
+    <div id="msg"></div>
+    <div id="path"></div>
+
+    <div id="jstree">
+        <ul></ul>
+    </div>
+
+</apex:page>
